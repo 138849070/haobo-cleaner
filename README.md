@@ -2,11 +2,11 @@
 
 > 颢，白貌。取「还存储一个干净面貌」的意思。
 
-一个 android 存储清理工具，走「清浊 / 存储空间清理」那一类路线：规则驱动扫描、分类清理、结果逐项勾选。
+一个 android 存储清理工具：规则驱动扫描、分类清理、结果逐项勾选，不静默删除任何东西。
 
-不需要 root，不需要装 Shizuku，**一次文件夹授权就能直接读写 `Android/data`**。
+不需要 root。Android 11 / 12 上**一次文件夹授权就能直接读写 `Android/data`**；Android 13 起系统收紧了这块，改用 Shizuku 即可。
 
-无广告，无联网，不申请「所有文件访问」也能用主要功能。
+无广告，无联网，不申请「所有文件访问」也能用大部分功能。
 
 [**下载 APK**](https://github.com/138849070/haobo-cleaner/releases/latest) · debug 签名，仅供测试
 
@@ -56,7 +56,9 @@ Intent(Intent.ACTION_OPEN_DOCUMENT_TREE).apply {
 
 ---
 
-## 六个模块
+## 十个模块
+
+**清理类**
 
 | 模块 | 扫描对象 | 需要什么 |
 |---|---|---|
@@ -66,8 +68,17 @@ Intent(Intent.ACTION_OPEN_DOCUMENT_TREE).apply {
 | 空文件夹 | 层层嵌套的空目录 | 所有文件访问 |
 | 大文件 | 超过 10 MB 的文件 | 所有文件访问 |
 | 安装包 | `*.apk` / `*.apks` / `*.xapk` / `*.apkm` | 所有文件访问 |
+| 重复文件 | 内容完全相同的文件（大小预筛 + SHA-1） | 所有文件访问 |
 
-所有结果列出完整路径，默认全选，可逐项取消。不会静默删除任何东西。
+**分析类**（只展示，不提供删除按钮）
+
+| 模块 | 内容 |
+|---|---|
+| 存储分析 | 各文件夹的空间占用，按体积排序 |
+| 分类分析 | 按图片 / 视频 / 音频 / 文档等类型统计 |
+| 应用管理 | 应用列表及其占用，可跳转卸载 |
+
+所有结果列出完整路径，默认全选，可逐项取消。
 
 ## 架构
 
@@ -151,7 +162,11 @@ app/src/main/
 │   ├── SafBackend.kt   # SAF 授权 Android 目录
 │   ├── ShellService.kt # 运行在 shell 进程（uid 2000）
 │   ├── ShellClient.kt  # Shizuku 授权、绑定、跨进程调用
-│   ├── ScanEngine.kt   # 六个模块的扫描与删除
+│   ├── StatsScanner.kt # StorageStatsManager 读各应用缓存，免 Shizuku
+│   ├── Analyzers.kt    # 重复文件 / 文件夹占用 / 分类统计 / 应用列表
+│   ├── Exclusions.kt   # 白名单，扫描与删除双重过滤
+│   ├── ScanEngine.kt   # 各模块的扫描与删除调度
+│   ├── HaoboApp.kt     # 崩溃日志采集
 │   └── MainActivity.kt # Compose UI：首页 + 结果页
 └── AndroidManifest.xml
 ```
@@ -159,7 +174,10 @@ app/src/main/
 ## 已知限制
 
 - **SAF 授权在 Android 13+ 失效**，那之后只能靠 Shizuku
+- 既没有 SAF 授权也没有 Shizuku 时，「应用清理」只能通过系统统计接口列出各应用的缓存大小，**看得到但删不掉**
 - SAF 走 ContentProvider，遍历 `cache` 明显慢于 File API，所以删除粒度是「整个 cache 目录」
+- 重复文件只比对 ≥ 1 MB 的文件，小文件收益低、全量哈希太慢
+- 存储分析与分类分析会遍历整个内部存储，文件多的机器首次扫描要几十秒
 - 大文件扫描会遍历 `DCIM`，视频多的机器首次扫描可能要几十秒
 - 单次扫描结果上限 3000 条，防止内存溢出
 - 少数应用把重要数据放在 `cache` 目录（不符合规范），清理前请看一眼路径
