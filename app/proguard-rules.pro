@@ -1,0 +1,5 @@
+-keep class rikka.shizuku.** { *; }
+-keep class moe.shizuku.** { *; }
+-keep class com.haobo.cleaner.IShellService { *; }
+-keep class com.haobo.cleaner.IShellService$Stub { *; }
+-keep class com.haobo.cleaner.ShellService { *; }
